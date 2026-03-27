@@ -1,0 +1,649 @@
+---
+title: "An opinionated comparison of model-based and classical ordination methods"
+institute: "Chair of Plant Ecology, University of Bayreuth"
+author: "Bert van der Veen"
+output: 
+  beamer_presentation:
+    toc: false
+    slide_level: 2
+    latex_engine: lualatex
+    includes:
+      in_header: header.tex
+urlcolor: orange
+editor_options: 
+  chunk_output_type: console
+header-includes:
+  - \usepackage{ulem}
+  - \usepackage{pgf}
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \tcbuselibrary{skins}
+  - \usepackage{tikz}
+  - \usepackage{xcolor}
+  - \usepackage{graphicx}
+  - \usetikzlibrary{calc, fit, positioning,arrows,shapes,tikzmark,spy,shadows.blur,matrix, arrows.meta}
+  - \tikzset{>=stealth}
+  - \tikzstyle{na} = [baseline=-.5ex]
+  - \usepackage{multicol}
+  - \usepackage{hyperref}
+  - \newcommand{\highlight}[2]{\colorbox{#1!17}{$\vphantom{(^\top}#2$}}
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+
+default_source_hook <- knit_hooks$get('source')
+default_output_hook <- knit_hooks$get('output')
+
+knit_hooks$set(
+  source = function(x, options) {
+    paste0(
+      "\n::: {.codebox data-latex=\"\"}\n\n",
+      default_source_hook(x, options),
+      "\n\n:::\n\n")
+  }
+)
+
+knit_hooks$set(
+  output = function(x, options) {
+    paste0(
+      "\n::: {.codebox data-latex=\"\"}\n\n",
+      default_output_hook(x, options),
+      "\n\n:::\n\n")
+  }
+)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Outline
+
+- Part I: Overview
+  - Model-based ordination
+  - Compared to classical methods
+- Part II: Examples
+  - Cover classes
+  - Biomass
+  - Continuous cover with complete presence/absence
+- Part III: Summary
+  - Contrast to classical methods
+
+
+# Part I: Overview
+
+## Limitations of classical multivariate analysis
+
+Classical ordination methods are limited:
+
+- Loose framework of separate methods
+- No explicit model structure
+- Cannot accommodate data properties
+- Strong assumptions about data properties and structure
+- Assumptions are not verifiable
+- No uncertainty
+- Lacks predictive capacity
+
+## Model-based ordination is the next step
+
+\begin{columns}
+\begin{column}{0.5\textwidth}
+Classical ordination stops at the biplot.
+\textcolor{red}{NMDS and distance-based methods traded process for pattern.}
+
+\vspace*{\baselineskip}
+
+With model-based ordination, the biplot is only the beginning.
+
+\vspace*{\baselineskip}
+
+It is also where ordination was headed \tiny (ter Braak and Prentice 1988, ter Braak 1985, Ihm and van Groenewoud 1975, Gauch et al. 1974) \normalsize prior to Minchin (1987) popularizing NMDS
+
+\end{column}
+\begin{column}{0.5\textwidth}
+```{r unc_ordi, echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=4, cache=TRUE, fig.align='center'}
+library(gllvm)
+invisible(TMB::openmp(11, autopar = TRUE))
+data(spider, package = "mvabund")
+fit_unc <- gllvm(spider$abund, num.lv = 2, family = "negative.binomial", seed = 1, quadratic = TRUE)
+ordiplot(fit_unc, symbols = TRUE, s.colors = "grey50",
+         main = "Unimodal unconstrained ordination", cex.main = 0.9, biplot = TRUE, xlim = c(-4,4), ylim = c(-3,3))
+```
+\end{column}
+\end{columns}
+
+
+## What is model-based ordination
+
+\vspace{0.5cm}
+\begin{equation*}
+    \tikzmarknode[fill=teal!20, inner sep=2pt, rounded corners=2pt]{dist}{y_{ij}} \sim
+    \tikzmarknode[fill=teal!20, inner sep=2pt, rounded corners=2pt]{distr}{f(\mu_{ij}, \phi_j)}
+\end{equation*}
+\only<2->{
+\begin{equation*}
+    \tikzmarknode[fill=blue!20, inner sep=2pt, rounded corners=2pt]{link}{g(\mu_{ij})} =
+    \only<3->{\tikzmarknode[fill=red!20, inner sep=2pt, rounded corners=2pt]{alpha}{\alpha_i} +}
+    \tikzmarknode[fill=orange!20, inner sep=2pt, rounded corners=2pt]{beta0}{\beta_{0j}}
+    \only<4->{+ \tikzmarknode[fill=green!20, inner sep=2pt, rounded corners=2pt]{env}{\mathbf{x}_i^\top \symbf{\beta}_j} +
+    \tikzmarknode[fill=cyan!20, inner sep=2pt, rounded corners=2pt]{specre}{\mathbf{z}_i^\top \mathbf{b}_j}}
+    + \tikzmarknode[fill=purple!20, inner sep=2pt, rounded corners=2pt]{latent}{\mathbf{u}_i^\top \symbf{\gamma}_j}
+\end{equation*}
+}
+\only<3->{
+\begin{equation*}
+    \alpha_i = \tikzmarknode[fill=red!10, inner sep=2pt, rounded corners=2pt]{alphafixed}{\mathbf{w}_i^\top \symbf{\delta}} +
+    \tikzmarknode[fill=red!30, inner sep=2pt, rounded corners=2pt]{alphare}{a_i}, \quad
+    \mathbf{a} \sim \mathcal{N}(\mathbf{0}, \symbf{\Sigma}^a), \quad
+    \mathrm{vec}(\mathbf{B}) \sim \mathcal{N}\!\left(\mathbf{0},\, \symbf{\Sigma}^r \otimes \symbf{\Sigma}\right)
+\end{equation*}
+}
+
+\begin{tikzpicture}[
+    overlay, remember picture,
+    >={Stealth[scale=1]},
+    annot/.style={font=\footnotesize\sffamily, align=center}
+]
+    \only<1>{
+        \node[annot, text=teal!80!black, above=0.8cm of distr] (t_distr) {Distribution};
+        \draw[->, teal!80!black] (t_distr) -- (distr.north);
+    }
+    \only<2->{
+        \node[annot, text=blue!80!black, above left=0.7cm and 0.2cm of link] (t_link) {Link\\function};
+        \draw[->, blue!80!black] (t_link.south) to[out=-80, in=150] (link.west);
+
+        \node[annot, text=orange!80!black, below=2.0cm of beta0] (t_beta0) {Species\\intercepts};
+        \draw[->, orange!80!black] (t_beta0) -- (beta0.south);
+
+        \node[annot, text=purple!80!black, below right=0.8cm and 0.8cm of latent] (t_latent) {Ordination};
+        \draw[->, purple!80!black] (t_latent.west) to[out=170, in=-50] (latent.south);
+    }
+    \only<3->{
+        \node[annot, text=red!80!black, above left=1.8cm and 1.5cm of alpha] (t_alpha) {Site\\intercepts};
+        \draw[->, red!80!black] (t_alpha.east) to[out=0, in=130] (alpha.north);
+
+        \node[annot, text=red!60!black, below=0.5cm of alphafixed] (t_alphafixed) {Fixed effects};
+        \draw[->, red!60!black] (t_alphafixed) -- (alphafixed.south);
+
+        \node[annot, text=red!80!black, below=1.0cm of alphare] (t_alphare) {Random effect};
+        \draw[->, red!80!black] (t_alphare) -- (alphare.south);
+    }
+    \only<4->{
+        \node[annot, text=green!60!black, above right=1.8cm and 0.5cm of env] (t_env) {Environmental predictors\\(with species coefficients)};
+        \draw[->, green!60!black] (t_env.south) to[out=-100, in=60] (env.north);
+
+        \node[annot, text=cyan!60!black, below=1.2cm of specre] (t_specre) {Species\\random effects};
+        \draw[->, cyan!60!black] (t_specre) -- (specre.south);
+    }
+\end{tikzpicture}
+
+## Key advantages of Model-based ordination
+
+\footnotesize
+
+- \textbf{Distribution-based}: no distances or data transformations; direct connection to data is maintained
+- \textbf{Random effects}: integrates ordination with mixed-effects modeling for hierarchical designs
+- \textbf{Diagnostics and inference}: enables assumption checking, model evaluation, uncertainty quantification
+- \textbf{Predictive capacity}: enables (multivariate) forecasting
+- \textbf{Diversity estimation}: facilitates inference on diversity in the same framework
+
+# Part II: Examples
+
+Each example steps further from what classical ordination can do:
+
+\begin{enumerate}
+\item Cover classes from Skabbholmen, Sweden
+\begin{itemize}
+\item design-aware ordination: random effects change interpretation
+\end{itemize}
+\item Biomass data from the Waddensea, Germany
+\begin{itemize}
+\item ordination and prediction are the same model
+\end{itemize}
+\item Cover data from Rothamsted, United Kingdom
+\begin{itemize}
+\item predicting an emergent community property: species richness
+\end{itemize}
+\end{enumerate}
+
+## Example 1: Skabbholmen, Sweden
+
+- **Sites**: 64 unique plots across 4 transects
+- **Species**: 49 vascular plant species with cover data on a 5-degree Hult-Sernander-Du Rietz scale
+- **Predictors**: 
+  - Year (1978 vs 1984) - representing temporal change
+  - Elevation (centimeters) - representing long-term land uplift
+- **Data type**: Cover classes
+- **Analysis**: Cumulative probit/logit model with 2 informed LVs
+
+Previously analyzed by [ter Braak (1987)](https://link.springer.com/article/10.1007/BF00038688)
+\newline
+Originally by [Cramer and Hytteborn (1987)](https://link.springer.com/article/10.1007/BF00038697)
+
+## Example 1: Does design matter for ordination?
+
+Three versions of the same model — differing only in how transect structure is handled:
+
+- **No transect RE**: latent variables must absorb any spatial clustering between transects
+- **Species-common transect RE**: one intercept shift per transect, shared across all species
+- **Species-specific transect RE**: each species gets its own transect random effect
+
+```{r skabb_mod, warning=F, error=F, message=F, echo=F, message=F, warning=F, cache = TRUE}
+# with and without row effect: confounding
+
+library(gllvm)
+invisible(TMB::openmp(11,autopar=TRUE))
+
+data("Skabbholmen")
+Y <- Skabbholmen$Y[,order(colSums(ifelse(Skabbholmen$Y==0,0,1)),decreasing=TRUE)]
+X <- Skabbholmen$X
+# Fit the model
+model <- gllvm(y = Y, X = X, studyDesign = X,
+    lv.formula = ~scale(Elevation) + I((Year-1978)/6),
+    num.lv.c = 2,
+    family = "ordinal",
+    zeta.struc="common",
+    row.eff=~(1|transectID),
+    quadratic = "LV",
+    n.init = 1,link="logit", seed = 9705, jitter.var=0.1
+    )
+model2 <- gllvm(y = Y, X = X, 
+    lv.formula = ~scale(Elevation) + I((Year-1978)/6),
+    num.lv.c = 2,
+    family = "ordinal",
+    zeta.struc="common",
+    quadratic = "LV",
+    n.init = 1,link="logit", seed = 9705,jitter.var=0.1,
+    )
+model3 <- gllvm(y = Y, X = X,
+    lv.formula = ~scale(Elevation) + I((Year-1978)/6),
+    num.lv.c = 2,
+    family = "ordinal",
+    zeta.struc="common",
+    formula=~(1|transectID),
+    quadratic = "LV",
+    link="logit", seed = 5922 # because this takes quite long; ran it 100 times to get the seed
+    )
+```
+
+## Example 1: Random effects change the ordination
+
+```{r ordiplot_skabb_opt, warning=F, error=F, message=F, echo=F, fig.width=9, fig.height=3.2, out.width="\\linewidth"}
+#knitr::load_cache("skabb_mod",path="/home/bertv/github/NINA/ModelvsClassic_cache/beamer/")
+library(ggplot2)
+
+# Rotate each model so its elevation loading has zero first-dimension component
+get_data <- function(object) {
+  LV   <- gllvm::getLV(object)
+  coef <- object$params$LvXcoef
+  sds  <- apply(object$lv.X.design, 2, sd)
+  sds[sds == 0] <- 1
+  coef <- coef / sds
+  # rotation angle: set elevation's LV1 component to zero (point straight up)
+  elev_row <- grep("elev", rownames(coef), ignore.case = TRUE)[1]
+  ev    <- coef[elev_row, ]
+  theta <- pi/2 - atan2(ev[2], ev[1])
+  R     <- matrix(c(cos(theta), sin(theta), -sin(theta), cos(theta)), 2, 2, byrow = TRUE)
+  list(LV = LV %*% R, coef = coef %*% R)
+}
+
+d2 <- get_data(model2)
+d1 <- get_data(model)
+d3 <- get_data(model3)
+
+# Tidy site-scores data frame
+model_labels <- c("No transect RE", "Species-common transect RE", "Species-specific transect RE")
+sites <- do.call(rbind, Map(function(d, lab) {
+  data.frame(LV1 = d$LV[,1], LV2 = d$LV[,2], transect = X$transectID, model = lab)
+}, list(d2, d1, d3), model_labels))
+sites$model <- factor(sites$model, levels = model_labels)
+
+# Scale arrows to 80% of the global LV range so all panels share the same scale
+global_sc <- 0.8 * max(abs(c(d1$LV, d2$LV, d3$LV)))
+
+make_arrows <- function(d, lab) {
+  coef_sc <- d$coef / max(abs(d$coef)) * global_sc
+  idx     <- apply(coef_sc, 1, function(x) max(abs(x)) > 0.001)
+  coef_sc <- coef_sc[idx, , drop = FALSE]
+  data.frame(x1 = coef_sc[,1], y1 = coef_sc[,2],
+             label = rownames(coef_sc), model = lab, stringsAsFactors = FALSE)
+}
+arrows <- do.call(rbind, Map(make_arrows, list(d2, d1, d3), model_labels))
+arrows$model <- factor(arrows$model, levels = model_labels)
+
+n_tr <- nlevels(X$transectID)
+ggplot(sites, aes(LV1, LV2, colour = transect, shape = transect)) +
+  geom_point(size = 2) +
+  geom_segment(data = arrows,
+               aes(x = 0, y = 0, xend = x1, yend = y1),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
+               colour = "red", linewidth = 0.8, inherit.aes = FALSE) +
+  geom_text(data = arrows,
+            aes(x = x1 * 1.15, y = y1 * 1.15, label = label),
+            colour = "red", size = 4, inherit.aes = FALSE) +
+  scale_colour_manual(values = palette()[seq_len(n_tr)]) +
+  scale_shape_manual(values = seq_len(n_tr) + 14L) +
+  facet_wrap(~model, nrow = 1) +
+  labs(x = "Latent variable 1", y = "Latent variable 2",
+       colour = "Transect", shape = "Transect") +
+  theme_classic(base_size = 14) +
+  theme(legend.position = "bottom",
+        strip.background = element_blank(),
+        panel.spacing = unit(0.8, "lines"))
+```
+
+- Without a transect RE, transect effect are confounded with the environmental space: the axes reflect clustering
+- Adding the RE removes the confounding, the latent variables align with the elevation and year effects
+- The choice of RE structure is a modelling decision — one that classical ordination cannot make
+
+## Example 2: Wadden Sea, Germany
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth,height=0.7\textheight,keepaspectratio]{Dewenterfig1.jpg}
+\caption{nioz.nl}
+\end{figure}
+
+## Example 2: Wadden Sea, Germany
+
+- **Sites**: 3 sites at 3 transects on each of 3 islands
+- **Species**: 58 macrozoobenthos species
+- **Predictors**: 
+  - Season - representing temporal variation
+  - TOC - total organic carbon in sediment
+  - Elevation - elevation of sediment surface
+  - Mud - percentage of mud in sediment
+  - Chlorophyll a - primary production
+  - DIN -  dissolved inorganic nitrogen
+  - RDP - respiration rate of sediment
+- **Data type**: Biomass data
+- **Analysis**: Tweedie log-linear model with 2 constrained latent variables
+
+Originally by [Dewenter et al. (2023)](https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.10815)
+
+```{r wadden_example, echo=FALSE, message=FALSE, warning=FALSE, cache = TRUE}
+library(gllvm)
+invisible(TMB::openmp(11,autopar=TRUE))
+# Load the Wadden Sea data (macrozoobenthos abundance data)
+Y <- read.csv("waddenY2.csv")[,-c(1:2)]
+Y <- Y[, colSums(ifelse(Y==0,0,1))>2]  # Remove species with less than 3 non-zero values
+X <- read.csv("waddenX.csv")
+X <- X[,!apply(X,2,anyNA)]  # Remove columns with NA values
+X[,unlist(lapply(X,is.numeric))] <- scale(X[,unlist(lapply(X,is.numeric))])  # Scale numeric variables
+
+# Unconstrained ordination (simple model)
+#uord1 <- gllvm(Y, num.lv = 2, family = "tweedie", Power = NULL)
+
+# Constrained ordination with environmental variables
+# cord1 <- gllvm(Y, X = X, 
+#               num.RR = 2, lv.formula = ~season+TOC+I(TOC^2)+elevation+I(elevation^2)+silt_clay+I(silt_clay^2)+Chl.a+I(Chl.a^2)+DIN+I(DIN^2)+RDP+I(RDP^2), randomB = "LV", 
+#               family = "tweedie", Power = NULL, disp.formula = rep(1,ncol(Y)), seed = 1172) # after 200 iterations
+# added fixed row effects for lfexibilityf
+cord1 <- gllvm(Y, X = X, 
+               num.RR = 2, lv.formula = ~season+TOC+I(TOC^2)+elevation+I(elevation^2)+silt_clay+I(silt_clay^2)+Chl.a+I(Chl.a^2)+DIN+I(DIN^2)+RDP+I(RDP^2), randomB = "LV", 
+               family = "tweedie", Power = NULL, disp.formula = rep(1,ncol(Y)), row.eff = ~season+TOC+I(TOC^2)+elevation+I(elevation^2)+silt_clay+I(silt_clay^2)+Chl.a+I(Chl.a^2)+DIN+I(DIN^2)+RDP+I(RDP^2), studyDesign = X, seed = 1) 
+# Plot the constrained ordination
+# gllvm::ordiplot(cord1, symbols=TRUE, pch=X$island, 
+#                 s.colors = as.character(factor(X$island,labels  = c("blue", "green", "black"))), 
+#                 arrow.scale=0, s.cex = 2, cex.main = 2, cex.axis = 2, cex.lab = 2, 
+#                main = "Constrained ordination of Wadden Sea data")
+
+```
+
+## Example 2: Constrained ordination
+
+```{r wadden_ordiplot, echo = FALSE, warning=FALSE, message=FALSE, fig.height = 4, fig.width = 4}
+library(ggplot2)
+
+# Extract site scores (latent variables) and predictor coefficients
+LV <- gllvm::getLV(cord1)
+coefs <- cord1$params$LvXcoef
+sds <- apply(cord1$lv.X.design, 2, sd)
+sds[sds == 0] <- 1
+coefs <- coefs / sds
+
+# Keep only main effects (no quadratic terms) for cleaner arrows
+main_idx <- !grepl("^I\\(", rownames(coefs))
+coefs_main <- coefs[main_idx, , drop = FALSE]
+
+# Scale arrows relative to site score range
+sc <- 0.8 * max(abs(LV))
+coefs_sc <- coefs_main / max(abs(coefs_main)) * sc
+
+arrow_df <- data.frame(
+  x1 = coefs_sc[, 1], y1 = coefs_sc[, 2],
+  label = rownames(coefs_sc)
+)
+
+site_df <- data.frame(LV1 = LV[, 1], LV2 = LV[, 2], season = X$season)
+
+ggplot(site_df, aes(LV1, LV2, colour = season)) +
+  geom_point(size = 1.5) +
+  geom_segment(data = arrow_df,
+               aes(x = 0, y = 0, xend = x1, yend = y1),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
+               colour = "red", linewidth = 0.4, inherit.aes = FALSE) +
+  geom_text(data = arrow_df,
+            aes(x = x1 * 1.15, y = y1 * 1.15, label = label),
+            colour = "red", size = 3, inherit.aes = FALSE) +
+  labs(x = "Latent variable 1", y = "Latent variable 2", colour = "Season") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+## Example 2: Variance partitioning
+
+```{r wadden_example_VPplot, echo = FALSE, warning=FALSE, message=FALSE, fig.height = 5, out.height = "70%",out.width = "100%",fig.width = 9,fig.align= "center"}
+plot(gllvm::VP(cord1), las =2, args.legend = list(cex = 0.7, bg = "white"), col = hcl.colors(5, "Dark 3"), lwd = 0.5,xlab=NA,main=NA,mar=c(0,0,0,0))
+```
+
+Variance partitioning attributes a large share of explained variance to TOC — suggesting it is an important driver.
+
+## Example 2: Species-specific results
+
+```{r wadden_example_SPplot, echo = FALSE, warning=FALSE, message=FALSE,out.width = "49%", fig.width=4, fig.height=4.5}
+gllvm::randomCoefplot(cord1,which.Xcoef="TOC", mar = c(4,5,0,1))
+gllvm::randomCoefplot(cord1,which.Xcoef="I(TOC^2)",y.label = FALSE,  mar = c(4,0,0,1))
+```
+
+Yet species-specific TOC effects are highly uncertain and vary widely across species — variance alone is not enough.
+
+## Example 2: Species-level predictions
+
+```{r preds, echo = FALSE, cache = TRUE}
+newX = data.frame(elevation = rep(seq(min(X$elevation), max(X$elevation), length.out = 100),times=2), silt_clay = mean(X$silt_clay),
+                                              season = factor(rep(c("spring","summer"), each = 100)),
+                                              TOC = mean(X$TOC),
+                                              Chl.a = mean(X$Chl.a), DIN = mean(X$DIN), RDP = mean(X$RDP))
+                                              
+preds = predict(cord1, newX = newX, se.fit = 20e3)
+                                              
+```
+
+```{r wadden_example_plot, echo = FALSE, warning=FALSE, message=FALSE, fig.height = 9, fig.width = 14, fig.align = "center"}
+spp_names <- colnames(cord1$y)   # change to readable labels here if needed
+
+plotdat_long <- data.frame(
+  elevation = rep(newX$elevation, times = length(spp_names)),
+  season    = rep(newX$season,    times = length(spp_names)),
+  species   = factor(rep(spp_names, each = nrow(newX)), levels = spp_names),
+  fit       = as.vector(preds$fit),
+  lwr       = as.vector(preds$lower),
+  upr       = as.vector(preds$upper)
+)
+
+library(ggplot2)
+ggplot(plotdat_long, aes(elevation, fit, colour = season, fill = season)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr, fill = season), alpha = 0.3, colour = NA) +
+  geom_line(linewidth = 0.2) +
+  facet_wrap(~ species, scales = "free_y") +
+  labs(y = "log(Predicted response)", x = "Elevation",
+       colour = "Season", fill = "Season") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom", strip.background = element_blank(),, axis.title.x = element_text(size = 23), axis.title.y  = element_text(size = 23),
+        panel.spacing = unit(0.8, "lines")) +
+  geom_rug(aes(x = elevation), data = X, inherit.aes = FALSE, length = unit(0.1, "npc"))
+```
+
+## Example 3: Rothamsted, United Kingdom
+
+- **Sites**: 16 plots, each with subplots
+- **Species**: 57 vascular plant species
+- **Predictors**: 
+  - Fertilizer treatment
+    - Phosphorus, Potassium, Nitrogen, Liming, and so on
+- **Data type**: Continuous cover with absence and presence
+- **Analysis**: Ordered beta model with two constrained latent variables
+
+Originally studied by a.o. [Crawley et al. (2005)](https://oro.open.ac.uk/2295/1/Crawley_etal_2005.pdf)
+
+## Example 3: From ordination to diversity
+
+Species richness is not modelled directly — it emerges from the joint species model:
+
+- No separate richness model is needed — richness emerges from the joint species model for any data type
+- Uncertainty propagates naturally from species-level predictions, avoiding distributional assumptions on richness directly
+
+\pause
+
+Both the species responses and the community-level summary are coherently estimated in one step.
+
+## Example 3: Species richness predictions
+
+```{r parkgrass_analysis, echo=FALSE, message=FALSE, warning=FALSE, cache = TRUE}
+library(readxl)
+
+Y <- read.csv("/home/bertv/Dropbox/SR_regression/park-grass/parkgrass.csv")
+soil <- read_xlsx("/home/bertv/Dropbox/SR_regression/park-grass/01-PGsoilpH/Park Grass soil pH 1876-2023 - data-PG-soil-pH-1876-2023-01.xlsx", sheet = 3)
+dat <-  merge(Y,soil,by.x=c("plot_id","sample_year"),by.y =  c("plot_id","harvest_year"))
+dat <- dat[!is.na(dat$pH_soil),]
+Y <- dat[,28:95]
+X <- dat[,-c(28:95)]
+Y <- Y[,colSums(Y,na.rm=TRUE)!=0]
+# Two NA rows for some reason
+X <- X[-which(rowSums(Y,na.rm=TRUE)==0),]
+Y <- Y[-which(rowSums(Y,na.rm=TRUE)==0),]
+Y <- Y[,colSums(ifelse(Y==0,0,1))>3]
+library(gllvm)
+invisible(TMB::openmp(11,autopar=TRUE))
+X$pH_soil.s <- scale(X$pH_soil)
+setMap = numeric(ncol(Y*2))
+setMap[seq_len(ncol(Y))*2] <- NA
+setMap[seq_len(ncol(Y))*2-1] <- 1:ncol(Y)
+
+X$treatment <- relevel(as.factor(X$treatment), ref = "Nil")
+# contrasts(X$treatment) <- contr.sum(nlevels(X$treatment))
+
+setMap = numeric(ncol(Y*2))
+setMap[seq_len(ncol(Y))*2] <- NA
+setMap[seq_len(ncol(Y))*2][which(apply(Y,2,function(x)sum(x==100))>0)]<-ncol(Y)+1
+setMap[seq_len(ncol(Y))*2-1] <- 1:ncol(Y)
+
+model <- gllvm(y = Y/100, X = X[, c("pH_soil.s", "treatment"), drop = FALSE], family = "orderedBeta", num.RR = 2, lv.formula = ~(pH_soil.s + I(pH_soil.s^2) + I(pH_soil.s^3)) * treatment, studyDesign = X,
+               row.eff = ~(pH_soil.s + I(pH_soil.s^2) + I(pH_soil.s^3)) * treatment,
+               randomB = "LV", zeta.struc = "common", link = "logit", disp.formula = rep(1, ncol(Y)), zetacutoff = c(-2, 5), seed = 1222) # after 84 iterations
+```
+
+```{r park_grasss_SR_calc, echo = FALSE,cache=TRUE}
+# Make predictions for all treatments
+x <- aggregate(X$pH_soil.s,by=list(X$treatment), FUN = range)
+newX <- do.call(rbind,sapply(1:19,function(i)data.frame(pH_soil.s = seq(x[[2]][i,1],x[[2]][[i,2]],length.out=50),treatment = x[[1]][i]), simplify=FALSE))
+newX$treatment <- relevel(newX$treatment,ref="Nil")
+colnames(newX) = c("pH_soil.s","treatment")
+
+invisible(gllvm:::set_omp_threads(11))
+test<- gllvm::predictSR(model, newX = newX)
+``` 
+
+```{r parkgrass_plot, echo=FALSE, message=FALSE, warning=FALSE, out.height = "85%", fig.align = "center"}
+
+# Prepare data frames for plotting
+df_pred <- data.frame(
+  pH = newX$pH_soil.s * sd(X$pH_soil) + mean(X$pH_soil),
+  y = test$expected$fit,
+  lower = test$expected$lower,
+  upper = test$expected$upper,
+  treatment = factor(newX$treatment, levels = unique(X$treatment))
+)
+
+df_obs <- data.frame(
+  pH = X$pH_soil,
+  y = rowSums(ifelse(model$y == 0, 0, 1)),
+  treatment = factor(X$treatment, levels = unique(X$treatment))
+)
+
+# Define a logical order for your treatments
+treatment_order <- c(
+  "Nil", "P", "K", "FYM/FM", "(FYM/FM)", "N1", "N*1", "N2+P", 
+  "PNaMg", "PKNaMg", "N1+PKNaMg", "N*1+PKNaMg", "N2+PNaMg", 
+  "N2+PKNaMg", "N*2+PKNaMg", "(N*2)PKNaMg", "(N2)PKNaMg", 
+  "N3+PKNaMg", "N3+PKNaMgSi" 
+)
+
+df_pred$treatment <- factor(newX$treatment, levels = treatment_order)
+df_obs$treatment <- factor(X$treatment, levels = treatment_order)
+
+library(ggplot2)
+
+# Plot with facets
+ggplot() +
+  geom_line(data = df_pred, aes(x = pH, y = y), linewidth = 0.8, color = "black") +
+  geom_ribbon(data = df_pred, aes(ymin = lower, ymax = upper, x = pH), fill = "gray", alpha = 0.5) +
+  geom_point(data = df_obs, aes(x = pH, y = y), shape = 16, size = 1, color = "red") +
+  facet_wrap(~treatment) +
+  labs(x = "Soil pH", y = "Species richness") +
+  theme_classic(base_size=16)
+```
+
+# Part III: Summary
+
+## What the examples show \footnotesize \newline and what classical ordination cannot do
+
+\begin{columns}
+\begin{column}{0.48\textwidth}
+\begin{enumerate}
+\item \textbf{Skabbholmen}: Ignoring hierarchical design confounds the ordination
+\item \textbf{Wadden Sea}: With model-based ordination species-level forecasting comes for free
+\item \textbf{Park Grass}: When the species data is modelled, community-level metrics follow
+\end{enumerate}
+\end{column}
+\begin{column}{0.48\textwidth}
+\only<2->{
+\textbf{Classical ordination:}
+\begin{enumerate}
+\item No hierarchical design: RDA/CCA cannot incorporate random effects
+\item Stop at the biplot: there is no prediction or uncertainty
+\item Severs the data connection: you cannot extract diversity
+\end{enumerate}
+}
+\end{column}
+\end{columns}
+
+\only<3->{
+Pattern visualization → design-aware inference → multivariate prediction → community-level forecasting.
+}
+
+## Summary
+
+Model-based ordination is not more complex, but more complete:
+
+- All data types handled in a single, coherent framework
+- Non-linearity: what NMDS approximates via ranks, model-based ordination handles explicitly via the link function and model
+- Rare species: data deficiency offset by partial pooling across species
+- Assumptions are explicit, verifiable, and can be relaxed
+- Uncertainty is propagated, not ignored
+- Hierarchical designs are accommodated naturally
+- Prediction is built in, not bolted on
+
+
+## Future directions
+
+- Diversity measures directly from multispecies models (van der Veen in prep., Many authors et al. in prep)
+- Temporal; Rugstad et al. in prep.
+- Spatial; Korhonen et al. in prep
+- Better approximate likelihood methods
+- Structured species' random effects
+- Phylogenetic ordination, Hierarchical ordination  [(O'Hara and van der Veen preprint)](https://www.biorxiv.org/content/10.1101/2024.01.08.574701v1)
+
+\pause
+
+I haven't really spoken about species' correlation in a JSDM context, but it's here.
