@@ -68,6 +68,8 @@ knitr::opts_chunk$set(echo = TRUE)
 - Part III: Summary
   - Contrast to classical methods
 
+Slides and code: \url{https://github.com/BertvanderVeen/NINA}
+
 
 # Part I: Overview
 
